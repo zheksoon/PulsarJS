@@ -32,15 +32,15 @@ describe('Observable', function() {
     describe('#computable test', function() {
         it('creates computable', function() {
             var c = computable(function() {});
-            assert.equal(0, c.revision);
-            assert.equal(1, c.argumentsRevision);
+            assert.equal(1, c.revision);
+            assert.equal(0, c.resultRevision);
             assert.equal(undefined, c.value);
             assert.equal(undefined, c.get());
         });
         it('creates computable that returns a number', function() {
             var c = computable(function() { return 1});
-            assert.equal(0, c.revision);
-            assert.equal(1, c.argumentsRevision);
+            assert.equal(1, c.revision);
+            assert.equal(0, c.resultRevision);
             assert.equal(undefined, c.value);
             assert.equal(1, c.get());
             assert.equal(1, c.value);
@@ -49,7 +49,7 @@ describe('Observable', function() {
             var o = observable(1);
             var c = computable(function() {return o.get() * 2});
             assert.equal(1, o.revision);
-            assert.equal(0, c.revision);
+            assert.equal(2, c.revision);
             assert.equal(undefined, c.value);
 
             assert.equal(1, o.get());

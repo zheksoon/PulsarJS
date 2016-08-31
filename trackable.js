@@ -9,107 +9,107 @@ function nextRevision() {
     return ++globalRevision;
 }
 
-function observable(value) {
-    return {
-        revision: nextRevision(),
-        observers: [],
-        observerRevisions: [],
-        value: value,
+function ObservableBase(value) {
+    this.value = value;
+    this.revision = nextRevision();
+    this.resultRevision = 0;
+    this.observers = [];
+    this.observerRevisions = [];
+}
 
-        get: function() {
-            var globalCallStackLength = globalCallStack.length;
-            if (globalCallStackLength > 0) {
-                // console.log('Computable.get: adding observable to list...')
-                var observer = globalCallStack[globalCallStackLength - 1];
-                var observers = this.observers;
-                var observerRevisions = this.observerRevisions;
-                var lastObserverIndex = observers.length - 1;
-                if (observers[lastObserverIndex] === observer) {
-                    observerRevisions[lastObserverIndex] = observer.argumentsRevision;
-                } else {
-                    observers.push(observer);
-                    observerRevisions.push(observer.argumentsRevision);
-                }
-            }
-            return this.value;
-        },
-
-        set: function(value) {
-            // console.log('Observable: setting with value', value);
-            this.value = value;
-            this.revision = nextRevision();
-
+ObservableBase.prototype = {
+    addObserver: function() {
+        var globalCallStackLength = globalCallStack.length;
+        if (globalCallStackLength > 0) {
+            var observer = globalCallStack[globalCallStackLength - 1];
             var observers = this.observers;
             var observerRevisions = this.observerRevisions;
-            var observersLength = observers.length
-            var i = 0, j = 0, observer, observerRevision;
-            while (j < observersLength) {  
-                observer = observers[j];
-                observerRevision = observerRevisions[j];
-                if (observer.revision === observerRevision) {
-                    if (observer.revision === observer.argumentsRevision) {
-                        observer.notifyRevisionUpdate(this.revision);
-                    }
-                    if (i < j) {
-                        observers[i] = observer;
-                        observerRevisions[i] = observerRevision;
-                    }
-                    i++;
+            var lastObserverIndex = observers.length - 1;
+            if (observers[lastObserverIndex] === observer) {
+                observerRevisions[lastObserverIndex] = observer.revision;
+            } else {
+                observers.push(observer);
+                observerRevisions.push(observer.revision);
+            }
+        }
+    },
+    notifyAndCleanupObservers: function() {
+        var observers = this.observers;
+        var observerRevisions = this.observerRevisions;
+        var observersLength = observers.length
+        var i = 0, j = 0, observer, observerRevision;
+        while (j < observersLength) {  
+            observer = observers[j];
+            observerRevision = observerRevisions[j];
+            if (observer.resultRevision === observerRevision) {
+                if (observer.resultRevision === observer.revision) {
+                    observer.notifyRevisionUpdate(this.revision);
                 }
-                j++;
+                if (i < j) {
+                    observers[i] = observer;
+                    observerRevisions[i] = observerRevision;
+                }
+                i++;
             }
-            if (i < j) {
-                observers.length = i;
-                observerRevisions.length = i;
-            }
+            j++;
+        }
+        if (i < j) {
+            observers.length = i;
+            observerRevisions.length = i;
         }
     }
 }
 
-function computable(thunk) {
-    return {
-        revision: 0,
-        argumentsRevision: nextRevision(),
-        observers: [],
-        observerRevisions: [],
-        value: undefined,
+function Observable(value) {
+    ObservableBase.call(this, value);
+}
 
-        get: function() {
-            var globalCallStackLength = globalCallStack.length;
-            if (globalCallStackLength > 0) {
-                // console.log('Computable.get: adding observable to list...')
-                var observer = globalCallStack[globalCallStackLength - 1];
-                var observers = this.observers;
-                var observerRevisions = this.observerRevisions;
-                var lastObserverIndex = observers.length - 1;
-                if (observers[lastObserverIndex] === observer) {
-                    observers[lastObserverIndex] = observer;
-                    observerRevisions[lastObserverIndex] = observer.argumentsRevision;
-                } else {
-                    observers.push(observer);
-                    observerRevisions.push(observer.argumentsRevision);
-                }
-            }
-            // console.log('computable.get:', this);
-            if (this.revision !== this.argumentsRevision) {
-                // console.log('Computable.get: revision', this.revision, 'argument revision', this.argumentsRevision)
-                globalCallStack.push(this);
-                this.value = thunk();
-                this.revision = this.argumentsRevision;
-                globalCallStack.pop();
-            }
-            return this.value;
-        },
-
-        notifyRevisionUpdate: function(revision) {
-            this.argumentsRevision = revision;
-            // revision propagation here...       
-        }
+Observable.prototype = Object.assign(Object.create(ObservableBase.prototype), {
+    get: function() {
+        this.addObserver();
+        return this.value;
+    },
+    set: function(value) {
+        this.value = value;
+        this.revision = nextRevision();
+        this.notifyAndCleanupObservers();
     }
+});
+
+function observable(value) {
+    return new Observable(value);
+}
+
+function Computable(thunk) {
+    ObservableBase.call(this);
+    this.thunk = thunk;
+}
+
+Computable.prototype = Object.assign(Object.create(ObservableBase.prototype), {
+    get: function() {
+        this.addObserver();
+        if (this.revision !== this.resultRevision) {
+            globalCallStack.push(this);
+            this.value = this.thunk();
+            this.resultRevision = this.revision;
+            globalCallStack.pop();
+        }
+        return this.value;
+    },
+    notifyRevisionUpdate: function(revision) {
+        this.revision = revision;
+        this.notifyAndCleanupObservers();  
+    }
+})
+
+function computable(thunk) {
+    return new Computable(thunk);
 }
 
 module.exports = {
     resetGlobals: resetGlobals,
+    Observable: Observable,
+    Computable: Computable,
     observable: observable,
     computable: computable,
 }
