@@ -19,20 +19,15 @@ function observable(value) {
         get: function() {
             var globalCallStackLength = globalCallStack.length;
             if (globalCallStackLength > 0) {
+                // console.log('Computable.get: adding observable to list...')
                 var observer = globalCallStack[globalCallStackLength - 1];
-                var observerRevision = observer.revision;
-                var observersLength = this.observers.length;
-                // should be a binary search here...
-                // console.log('observable.get: value',this.value,'searching for revision',observerRevision,'in',this.observerRevisions)
-                i = 0;
-                while (i < observersLength && this.observerRevisions[i] < observerRevision)
-                    i++;
-                if (i === observersLength || this.observerRevisions[i] !== observerRevision) {
-                    this.observers.push(observer);
-                    this.observerRevisions.push(observer.argumentsRevision);
+                var observers = this.observers;
+                var lastObserverIndex = observers.length - 1;
+                if (observers[lastObserverIndex] === observer) {
+                    observerRevisions[lastObserverIndex] = observer.argumentsRevision;
                 } else {
-                    this.observers[i] = observer;
-                    this.observerRevisions[i] = observer.argumentsRevision;
+                    observers.push(observer);
+                    observerRevisions.push(observer.argumentsRevision);
                 }
             }
             return this.value;
@@ -56,7 +51,6 @@ function observable(value) {
                     }
                     if (i < j) {
                         observers[i] = observer;
-                        observers[j] = null;
                         observerRevisions[i] = observerRevision;
                     }
                     i++;
@@ -84,18 +78,14 @@ function computable(thunk) {
             if (globalCallStackLength > 0) {
                 // console.log('Computable.get: adding observable to list...')
                 var observer = globalCallStack[globalCallStackLength - 1];
-                var observerRevision = observer.revision;
-                var observersLength = this.observers.length;
-                // should be a binary search here...
-                i = 0;
-                while (i < observersLength && this.observerRevisions[i] < observerRevision)
-                    i++;
-                if (i === observersLength || this.observerRevisions[i] !== observerRevision) {
-                    this.observers.push(observer);
-                    this.observerRevisions.push(observer.argumentsRevision);
+                var observers = this.observers;
+                var lastObserverIndex = observers.length - 1;
+                if (observers[lastObserverIndex] === observer) {
+                    observers[lastObserverIndex] = observer;
+                    observerRevisions[lastObserverIndex] = observer.argumentsRevision;
                 } else {
-                    this.observers[i] = observer;
-                    this.observerRevisions[i] = observer.argumentsRevision;
+                    observers.push(observer);
+                    observerRevisions.push(observer.argumentsRevision);
                 }
             }
             // console.log('computable.get:', this);
