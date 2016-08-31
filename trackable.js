@@ -22,6 +22,7 @@ function observable(value) {
                 // console.log('Computable.get: adding observable to list...')
                 var observer = globalCallStack[globalCallStackLength - 1];
                 var observers = this.observers;
+                var observerRevisions = this.observerRevisions;
                 var lastObserverIndex = observers.length - 1;
                 if (observers[lastObserverIndex] === observer) {
                     observerRevisions[lastObserverIndex] = observer.argumentsRevision;
@@ -79,6 +80,7 @@ function computable(thunk) {
                 // console.log('Computable.get: adding observable to list...')
                 var observer = globalCallStack[globalCallStackLength - 1];
                 var observers = this.observers;
+                var observerRevisions = this.observerRevisions;
                 var lastObserverIndex = observers.length - 1;
                 if (observers[lastObserverIndex] === observer) {
                     observers[lastObserverIndex] = observer;
