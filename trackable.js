@@ -6,7 +6,7 @@ function resetGlobals() {
 }
 
 function nextRevision() {
-    return ++globalRevision;
+    return ++globalRevision | 0;
 }
 
 function ObservableBase(value) {
@@ -25,7 +25,7 @@ ObservableBase.prototype = {
             var observers = this.observers;
             var observerRevisions = this.observerRevisions;
             var lastObserverIndex = observers.length - 1;
-            if (observers[lastObserverIndex] === observer) {
+            if (lastObserverIndex >= 0 && observers[lastObserverIndex] === observer) {
                 observerRevisions[lastObserverIndex] = observer.revision;
             } else {
                 observers.push(observer);
