@@ -14,8 +14,7 @@ function resetGlobals() {
 }
 
 function globalNextRevision() {
-    globalRevision = (globalRevision + 1) | 0;
-    return globalRevision;
+    return globalRevision = (globalRevision + 1) | 0;
 }
 
 function isLeadingReaction(observer) {
@@ -26,12 +25,10 @@ function isLeadingReaction(observer) {
             if (observerOwner.revision !== observerOwner.resultRevision || 
                 observerOwner.revision !== observer.observerRevision ||
                 !isLeadingReaction(observerOwner)) {
-                observer.isLeadingObserver = false;
-                return false;
+                return observer.isLeadingObserver = false;
             }
         }
-        observer.isLeadingObserver = true;
-        return true;
+        return observer.isLeadingObserver = true;
     } else {
         return observer.isLeadingObserver;
     }
@@ -53,7 +50,7 @@ function globalRunReactions() {
 function transaction(runner) {
     ++globalTransactionDepth;
     runner();
-    if (--globalTransactionDepth == 0) {
+    if (--globalTransactionDepth === 0) {
         globalRunReactions();
     }
 }
@@ -187,8 +184,8 @@ function Observer(runner) {
     this.revision = globalNextRevision();
     this.observer = null;
     this.observerRevision = null;
-    this.resultRevision = 0;
     this.transactionRevision = 0;
+    this.resultRevision = 0;
     this.runner = runner;
     
     this.run = function() {
