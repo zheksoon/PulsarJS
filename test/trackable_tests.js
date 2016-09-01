@@ -1,14 +1,14 @@
 var mocha = require('mocha');
 var assert = require('assert');
 
-var trackable = require('../trackable');
-var observable = trackable.observable;
-var computable = trackable.computable;
-var observer = trackable.observer;
+var yao = require('../yao');
+var observable = yao.observable;
+var computable = yao.computable;
+var observer = yao.observer;
 
 describe('Observable', function() {
     beforeEach('Reset global counters', function() {
-        trackable.resetGlobals();
+        yao.resetGlobals();
     })
 
     describe('#livecycle test', function() {

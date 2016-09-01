@@ -1,8 +1,8 @@
 {
-  "name": "trackable",
+  "name": "YAO",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "YAO (Yet Another Observable)",
+  "main": "yao.js",
   "scripts": {
     "test": "node ./node_modules/mocha/bin/mocha"
   },
