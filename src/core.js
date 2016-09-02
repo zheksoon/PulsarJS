@@ -89,10 +89,10 @@ ObservableBase.prototype = {
                     observers[i] = newObserver;
                     observerRevisions[i] = newObserver.revision;
                     this.lastValidObserversCount = this.observersCount = ++i;
-                    if (i > 15 && (observersCount > i * 3)) {
-                        observersCount >>= 1;
-                        observers.length = observersCount;
-                        observerRevisions.length = observersCount;
+                    if (i > 15 && (observers.length > i * 3)) {
+                        var newObserverArrayLength = observers.length >> 1
+                        observers.length = newObserverArrayLength;
+                        observerRevisions.length = newObserverArrayLength;
                     }
                     while (i < observersCount) {
                         observers[i++] = null;
@@ -130,10 +130,10 @@ ObservableBase.prototype = {
         }
         if (i < observersCount) {
             this.lastValidObserversCount = this.observersCount = i;
-            if (i > 15 && (observersCount > i * 3)) {
-                observersCount >>= 1;
-                observers.length = observersCount;
-                observerRevisions.length = observersCount;
+            if (i > 15 && (observers.length > i * 3)) {
+                var newObserverArrayLength = observers.length >> 1
+                observers.length = newObserverArrayLength;
+                observerRevisions.length = newObserverArrayLength;
             }
             while (i < observersCount) {
                 observers[i++] = null;
