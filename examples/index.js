@@ -32,23 +32,18 @@ var isDead = observable(false);
 var lastDead = isDead.get();
 
 observer(() => {
-    if (isDead.get() !== lastDead) {
-        lastDead = isDead.get();
-        if (lastDead) {
-            console.log('I SAY: dead...!');    
-            return;
-        } else {
-            console.log('I SAY: RESURRECTED!!!');
-        }
+    console.log("i am " + isDead.get());
+    if (isDead.get()) return;
+
+    if (isDead.get()) {
+        observer(() => {
+            console.log('I SAY: My health is ' + health.get());
+        });
+    } else {
+        observer(() => {
+            console.log('I SAY: My name is ' + name.get());
+        });
     }
-
-    observer(() => {
-        console.log('I SAY: My health is ' + health.get());
-    });
-
-    observer(() => {
-        console.log('I SAY: My name is ' + name.get());
-    });
 });
 
 

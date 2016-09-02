@@ -10,6 +10,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "benchmark": "^2.1.1",
+    "mobx": "^2.5.1",
     "mocha": "^3.0.2"
   }
 }

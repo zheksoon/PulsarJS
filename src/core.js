@@ -3,7 +3,8 @@
 */
 // (function() {
 var globalCallStack = [];
-var globalReactionList = [];
+var globalReactionList = new Array(15);
+var globalReactionCount = 0;
 var globalRevision = 0;
 var globalTransactionRevision = 0;
 var globalTransactionDepth = 0;
@@ -36,15 +37,19 @@ function isLeadingReaction(observer) {
 
 function globalRunReactions() {
     globalTransactionRevision = globalNextRevision();
-    for (var i = 0; i < globalReactionList.length; i++) {
+    for (var i = 0; i < globalReactionCount; i++) {
         var reaction = globalReactionList[i];
+        globalReactionList[i] = null;
         if (isLeadingReaction(reaction)) {
             reaction.run();
         } else {
             reaction.resultRevision = reaction.revision; // simulate a run without a run
         }
     }
-    globalReactionList.length = 0;
+    if (globalReactionCount > 15 && (globalReactionList.length >> 1) > globalReactionCount) {
+        globalReactionList.length = globalReactionCount;
+    }
+    globalReactionCount = 0;
 }
 
 function transaction(runner) {
@@ -55,40 +60,21 @@ function transaction(runner) {
     }
 }
 
-function Observable(value) {
-    this.value = value;
-    this.revision = globalNextRevision();
-    this.observers = [];
-    this.observerRevisions = [];
-    this.lastValidObserversCount = 0;
+function ObservableBase() {}
 
-    this.get =  function() {
-        this.addObserver();
-        return this.value;
-    }
-    this.set = function(value) {
-        this.value = value;
-        this.revision = globalNextRevision();
-        this.notifyAndCleanupObservers();
-        if (globalTransactionDepth === 0)  {
-            globalRunReactions();
-        }
-    }
-}
-
-Observable.prototype = {
+ObservableBase.prototype = {
     addObserver: function() {
         var globalCallStackLength = globalCallStack.length;
         if (globalCallStackLength > 0) {
             var newObserver = globalCallStack[globalCallStackLength - 1];
             var observers = this.observers;
-            var lastObserverIndex = observers.length - 1;
+            var observersCount = this.observersCount;
             var observerRevisions = this.observerRevisions;
-            if (lastObserverIndex >= 0 && observers[lastObserverIndex] === newObserver) {
-                observerRevisions[lastObserverIndex] = newObserver.revision;
-            } else if (lastObserverIndex >= 15 && (lastObserverIndex >> 1) > this.lastValidObserversCount) {
+            if (observersCount > 0 && observers[observersCount - 1] === newObserver) {
+                observerRevisions[observersCount - 1] = newObserver.revision;
+            } else if (observersCount > 15 && (observersCount >> 1) > this.lastValidObserversCount) {
                 var observer, observerRevision;
-                for (var i = 0, j = 0; j <= lastObserverIndex; j++) {  
+                for (var i = 0, j = 0; j < observersCount; j++) {
                     observer = observers[j];
                     observerRevision = observerRevisions[j];
                     if (observer.resultRevision === observerRevision) {
@@ -99,29 +85,36 @@ Observable.prototype = {
                         i++;
                     }
                 }
-                if (i < j) {
+                if (i < observersCount) {
                     observers[i] = newObserver;
-                    observers.length = i + 1;
                     observerRevisions[i] = newObserver.revision;
-                    observerRevisions.length = i + 1;
-                    this.lastValidObserversCount = i + 1;
+                    this.lastValidObserversCount = this.observersCount = ++i;
+                    if (i > 15 && (observersCount > i * 3)) {
+                        observersCount >>= 1;
+                        observers.length = observersCount;
+                        observerRevisions.length = observersCount;
+                    }
+                    while (i < observersCount) {
+                        observers[i++] = null;
+                    }
                 } else {
-                    observers.push(newObserver);
-                    observerRevisions.push(newObserver.revision);
-                    this.lastValidObserversCount = i;
+                    observers[observersCount] = newObserver;
+                    observerRevisions[observersCount] = newObserver.revision;
+                    this.lastValidObserversCount = this.observersCount = observersCount + 1;
                 }
             } else {
-                observers.push(newObserver);
-                observerRevisions.push(newObserver.revision);    
+                observers[observersCount] = newObserver;
+                observerRevisions[observersCount] = newObserver.revision;
+                this.observersCount = observersCount + 1;
             }
         }
     },
     notifyAndCleanupObservers: function() {
         var observers = this.observers;
         var observerRevisions = this.observerRevisions;
-        var observersLength = observers.length
+        var observersCount = this.observersCount;
         var observer, observerRevision;
-        for (var i = 0, j = 0; j < observersLength; j++) {  
+        for (var i = 0, j = 0; j < this.observersCount; j++) {  
             observer = observers[j];
             observerRevision = observerRevisions[j];
             if (observer.resultRevision === observerRevision) {
@@ -135,45 +128,77 @@ Observable.prototype = {
                 i++;
             }
         }
-        if (i < j) {
-            observers.length = i;
-            observerRevisions.length = i;
+        if (i < observersCount) {
+            this.lastValidObserversCount = this.observersCount = i;
+            if (i > 15 && (observersCount > i * 3)) {
+                observersCount >>= 1;
+                observers.length = observersCount;
+                observerRevisions.length = observersCount;
+            }
+            while (i < observersCount) {
+                observers[i++] = null;
+            }
         }
-        this.lastValidObserversCount = i;
     }
 }
 
+function Observable(value) {
+    this.value = value;
+    this.revision = globalNextRevision();
+    this.observers = [null, null];
+    this.observerRevisions = [0, 0];
+    this.observersCount = 0;
+    this.lastValidObserversCount = 0;
+}
+
+Observable.prototype = new ObservableBase();
+
+Observable.prototype.get =  function() {
+    this.addObserver();
+    return this.value;
+}
+
+Observable.prototype.set = function(value) {
+    this.value = value;
+    this.revision = globalNextRevision();
+    this.notifyAndCleanupObservers();
+    if (globalTransactionDepth === 0)  {
+        globalRunReactions();
+    }
+}
 
 function observable(value) {
     return new Observable(value);
 }
 
 function Computable(thunk) {
-    this.value = null;
+    this.value = undefined;
     this.revision = globalNextRevision();
-    this.observers = [];
-    this.observerRevisions = [];
+    this.observers = [null, null];
+    this.observerRevisions = [0, 0];
+    this.observersCount = 0;
     this.lastValidObserversCount = 0;
     this.resultRevision = 0;
     this.thunk = thunk;
-
-    this.get = function() {
-        this.addObserver();
-        if (this.revision !== this.resultRevision) {
-            globalCallStack.push(this);
-            this.value = this.thunk();
-            this.resultRevision = this.revision;
-            globalCallStack.pop();
-        }
-        return this.value;
-    }
-    this.notifyRevisionUpdate = function(revision) {
-        this.revision = revision;
-        this.notifyAndCleanupObservers();  
-    }
 }
 
-Computable.prototype = Observable.prototype;
+Computable.prototype = new ObservableBase();
+
+Computable.prototype.get = function() {
+    this.addObserver();
+    if (this.revision !== this.resultRevision) {
+        globalCallStack.push(this);
+        this.value = this.thunk();
+        this.resultRevision = this.revision;
+        globalCallStack.pop();
+    }
+    return this.value;
+}
+
+Computable.prototype.notifyRevisionUpdate = function(revision) {
+    this.revision = revision;
+    this.notifyAndCleanupObservers();  
+}
 
 function computable(thunk) {
     return new Computable(thunk);
@@ -187,8 +212,12 @@ function Observer(runner) {
     this.transactionRevision = 0;
     this.resultRevision = 0;
     this.runner = runner;
-    
-    this.run = function() {
+
+    this.run();
+}
+
+Observer.prototype = {
+    run: function() {
         var globalCallStackLength = globalCallStack.length;
         if (globalCallStackLength > 0) {
             var observer = globalCallStack[globalCallStackLength - 1];
@@ -200,13 +229,11 @@ function Observer(runner) {
         this.resultRevision = this.revision;
         globalCallStack.pop();
         return value;
-    }
-    this.notifyRevisionUpdate = function(revision) {
+    },
+    notifyRevisionUpdate: function(revision) {
         this.revision = revision;
-        globalReactionList.push(this);
+        globalReactionList[globalReactionCount++] = this;
     }
-
-    this.run();
 }
 
 function observer(runner) {
