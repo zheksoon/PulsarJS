@@ -1,1 +1,1 @@
-require('./trackable_tests');
+require('./pulsar-js.specs.js');

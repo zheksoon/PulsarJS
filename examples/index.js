@@ -19,11 +19,11 @@
 // o2.set(20);
 // o3.set(30);
 
-var yao = require('./yao');
-var observable = yao.observable;
-var computable = yao.computable;
-var observer = yao.observer;
-var transaction = yao.transaction;
+var pulsar = require('../src/core');
+var observable = pulsar.observable;
+var computable = pulsar.computable;
+var observer = pulsar.observer;
+var transaction = pulsar.transaction;
 
 var health = observable('GOOD');
 var name = observable('John');
@@ -52,7 +52,7 @@ observer(() => {
 });
 
 
-transaction(() => {
+// transaction(() => {
     console.log("> health = 'OKAY';")
     health.set('OKAY');
 
@@ -76,5 +76,5 @@ transaction(() => {
 
     console.log("> isDead = false;")
     isDead.set(false);
-})
+// })
 

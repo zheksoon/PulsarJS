@@ -1,8 +1,8 @@
 {
-  "name": "YAO",
+  "name": "pulsar-js",
   "version": "1.0.0",
-  "description": "YAO (Yet Another Observable)",
-  "main": "yao.js",
+  "description": "PulsarJS - automatic observables that just work",
+  "main": "./src/core",
   "scripts": {
     "test": "node ./node_modules/mocha/bin/mocha"
   },

@@ -1,14 +1,13 @@
-var mocha = require('mocha');
 var assert = require('assert');
 
-var yao = require('../yao');
-var observable = yao.observable;
-var computable = yao.computable;
-var observer = yao.observer;
+var pulsar = require('../src/core');
+var observable = pulsar.observable;
+var computable = pulsar.computable;
+var observer = pulsar.observer;
 
 describe('Observable', function() {
     beforeEach('Reset global counters', function() {
-        yao.resetGlobals();
+        pulsar.resetGlobals();
     })
 
     describe('#livecycle test', function() {
