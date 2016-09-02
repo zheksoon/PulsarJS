@@ -11,7 +11,6 @@ var globalTransactionDepth = 0;
 
 function resetGlobals() {
     globalRevision = 0;
-    globalTransactionRevision = 0;
 }
 
 function globalNextRevision() {
@@ -139,7 +138,7 @@ ObservableBase.prototype = {
                 observers[i++] = null;
             }
         }
-    }
+    },
 }
 
 function Observable(value) {
@@ -208,7 +207,7 @@ function Observer(runner) {
     this.isLeadingObserver = false;
     this.revision = globalNextRevision();
     this.observer = null;
-    this.observerRevision = null;
+    this.observerRevision = 0;
     this.transactionRevision = 0;
     this.resultRevision = 0;
     this.runner = runner;
@@ -233,7 +232,10 @@ Observer.prototype = {
     notifyRevisionUpdate: function(revision) {
         this.revision = revision;
         globalReactionList[globalReactionCount++] = this;
-    }
+    },
+    cancel: function() {
+        this.revision = this.resultRevision = globalNextRevision();
+    },
 }
 
 function observer(runner) {
