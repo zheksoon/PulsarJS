@@ -1,6 +1,11 @@
 /*
-    YAO (Yet Another Observable)
+    PulsarJS core module implements basic observable principles:
+    * Observable values
+    * Computed values
+    * Reactions to changes in observable and computed values
+    * Transations - batched updates to computed values
 */
+
 // (function() {
 var globalCallStack = [];
 var globalReactionList = new Array(15);
@@ -17,20 +22,20 @@ function globalNextRevision() {
     return globalRevision = (globalRevision + 1) | 0;
 }
 
-function isLeadingReaction(observer) {
-    if (observer.transactionRevision !== globalTransactionRevision) {
-        observer.transactionRevision = globalTransactionRevision;
-        var observerOwner = observer.observer;
-        if (observerOwner) {
-            if (observerOwner.revision !== observerOwner.resultRevision || 
-                observerOwner.revision !== observer.observerRevision ||
-                !isLeadingReaction(observerOwner)) {
-                return observer.isLeadingObserver = false;
+function isLeadingReaction(reaction) {
+    if (reaction.transactionRevision !== globalTransactionRevision) {
+        reaction.transactionRevision = globalTransactionRevision;
+        var reactionOwner = reaction.parentReaction;
+        if (reactionOwner) {
+            if (reactionOwner.revision !== reactionOwner.resultRevision || 
+                reactionOwner.revision !== reaction.reactionOwnerRevision ||
+                !isLeadingReaction(reactionOwner)) {
+                return reaction.isLeadingReaction = false;
             }
         }
-        return observer.isLeadingObserver = true;
+        return reaction.isLeadingReaction = true;
     } else {
-        return observer.isLeadingObserver;
+        return reaction.isLeadingReaction;
     }
 }
 
@@ -203,43 +208,66 @@ function computable(thunk) {
     return new Computable(thunk);
 }
 
-function Observer(runner) {
-    this.isLeadingObserver = false;
+function Reaction(reaction, manager) {
+    this.isLeadingReaction = false;
     this.revision = globalNextRevision();
-    this.observer = null;
-    this.observerRevision = 0;
+    this.parentReaction = null;
+    this.parentReactionRevision = 0;
     this.transactionRevision = 0;
     this.resultRevision = 0;
-    this.runner = runner;
+    this.reaction = reaction;
+    this.manager = manager;
 
-    this.run();
+    if (!manager)
+        this.run(this, true);
 }
 
-Observer.prototype = {
+Reaction.prototype = {
     run: function() {
-        var globalCallStackLength = globalCallStack.length;
-        if (globalCallStackLength > 0) {
-            var observer = globalCallStack[globalCallStackLength - 1];
-            this.observer = observer
-            this.observerRevision = observer.revision;
+        if (!this.manager) {
+            this.runReaction();
+        } else {
+            this.manager();
         }
-        globalCallStack.push(this);
-        var value = this.runner();
-        this.resultRevision = this.revision;
-        globalCallStack.pop();
-        return value;
     },
     notifyRevisionUpdate: function(revision) {
         this.revision = revision;
         globalReactionList[globalReactionCount++] = this;
+    },
+    runReaction: function() {
+        var globalCallStackLength = globalCallStack.length;
+        if (globalCallStackLength > 0) {
+            var observer = globalCallStack[globalCallStackLength - 1];
+            this.parentReaction = observer
+            this.parentReactionRevision = observer.revision;
+        }
+        globalCallStack.push(this);
+        var value = this.reaction(this, false);
+        this.resultRevision = this.revision;
+        globalCallStack.pop();
+        return value;
     },
     cancel: function() {
         this.revision = this.resultRevision = globalNextRevision();
     },
 }
 
-function observer(runner) {
-    return new Observer(runner);
+function reaction(runner, manager) {
+    return new Reaction(runner, manager);
+}
+
+var ReactiveMixin = {
+    componentWillMount: function() {
+        this.reaction = new Reaction(this.reactive, function() {
+            this.forceUpdate();
+        });
+    },
+    componentWillUnmount: function() {
+        this.reaction.cancel();
+    },
+    render: function() {
+        return this.reaction.runReaction();
+    }
 }
 
 module.exports = {
@@ -248,8 +276,9 @@ module.exports = {
     Computable: Computable,
     observable: observable,
     computable: computable,
-    Observer: Observer,
-    observer: observer,
+    Reaction: Reaction,
+    reaction: reaction,
+    ReactiveMixin: ReactiveMixin,
     transaction: transaction,
 }
 

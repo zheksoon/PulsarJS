@@ -22,7 +22,7 @@
 var pulsar = require('../src/core');
 var observable = pulsar.observable;
 var computable = pulsar.computable;
-var observer = pulsar.observer;
+var reaction = pulsar.reaction;
 var transaction = pulsar.transaction;
 
 var health = observable('GOOD');
@@ -31,16 +31,16 @@ var isDead = observable(false);
 
 var lastDead = isDead.get();
 
-observer(() => {
+reaction(() => {
     console.log("i am " + isDead.get());
     if (isDead.get()) return;
 
     if (isDead.get()) {
-        observer(() => {
+        reaction(() => {
             console.log('I SAY: My health is ' + health.get());
         });
     } else {
-        observer(() => {
+        reaction(() => {
             console.log('I SAY: My name is ' + name.get());
         });
     }

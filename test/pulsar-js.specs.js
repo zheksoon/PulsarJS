@@ -3,7 +3,7 @@ var assert = require('assert');
 var pulsar = require('../src/core');
 var observable = pulsar.observable;
 var computable = pulsar.computable;
-var observer = pulsar.observer;
+var observer = pulsar.reaction;
 
 describe('Observable', function() {
     beforeEach('Reset global counters', function() {

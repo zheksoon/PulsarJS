@@ -3,7 +3,7 @@ var Benchmark = require('benchmark');
 var pulsar = require('../src/core');
 var pulsarObservable = pulsar.observable;
 var pulsarComputable = pulsar.computable;
-var pulsarObserver = pulsar.observer;
+var pulsarObserver = pulsar.reaction;
 
 var mobx = require('mobx');
 var mobxObservable = mobx.observable;
