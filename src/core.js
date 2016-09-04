@@ -93,7 +93,7 @@ ObservableBase.prototype = {
                     observers[i] = newObserver;
                     observerRevisions[i] = newObserver.revision;
                     this.lastValidObserversCount = this.observersCount = ++i;
-                    if (i > 15 && (observers.length > i * 3)) {
+                    if (i > 7 && (observers.length > i * 3)) {
                         var newObserverArrayLength = observers.length >> 1
                         observers.length = newObserverArrayLength;
                         observerRevisions.length = newObserverArrayLength;
@@ -123,7 +123,7 @@ ObservableBase.prototype = {
             observerRevision = observerRevisions[j];
             if (observer.resultRevision === observerRevision) {
                 if (observer.resultRevision === observer.revision) {
-                    observer.notifyRevisionUpdate(this.revision);
+                    observer.notifyRevisionUpdate();
                 }
                 if (i < j) {
                     observers[i] = observer;
@@ -199,8 +199,8 @@ Computable.prototype.get = function() {
     return this.value;
 }
 
-Computable.prototype.notifyRevisionUpdate = function(revision) {
-    this.revision = revision;
+Computable.prototype.notifyRevisionUpdate = function() {
+    this.revision = globalNextRevision();
     this.notifyAndCleanupObservers();  
 }
 
@@ -230,8 +230,7 @@ Reaction.prototype = {
             this.manager();
         }
     },
-    notifyRevisionUpdate: function(revision) {
-        this.revision = revision;
+    notifyRevisionUpdate: function() {
         globalReactionList[globalReactionCount++] = this;
     },
     runReaction: function() {
@@ -242,6 +241,7 @@ Reaction.prototype = {
             this.parentReactionRevision = observer.revision;
         }
         globalCallStack.push(this);
+        this.revision = globalNextRevision();
         var value = this.reaction(this, false);
         this.resultRevision = this.revision;
         globalCallStack.pop();
@@ -258,9 +258,13 @@ function reaction(runner, manager) {
 
 var ReactiveMixin = {
     componentWillMount: function() {
+        var self = this;
         this.reaction = new Reaction(this.reactive, function() {
-            this.forceUpdate();
+            self.forceUpdate();
         });
+    },
+    shouldComponentUpdate: function(nextProps) {
+        return this.reaction.revision !== this.reaction.resultRevision;
     },
     componentWillUnmount: function() {
         this.reaction.cancel();
