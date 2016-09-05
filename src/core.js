@@ -242,7 +242,7 @@ Reaction.prototype = {
         }
         globalCallStack.push(this);
         this.revision = globalNextRevision();
-        var value = this.reaction(this, false);
+        var value = this.reaction.apply(this, arguments);
         this.resultRevision = this.revision;
         globalCallStack.pop();
         return value;
