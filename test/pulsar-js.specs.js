@@ -53,15 +53,13 @@ describe('Observable', function() {
 
             assert.equal(1, o.get());
             assert.equal(2, c.get());
-            assert.equal(1, o.observers.length);
-            assert.equal(1, o.observerRevisions.length);
+            assert.equal(1, o.observersCount);
             assert.equal(2, c.revision);
             assert.equal(2, o.observerRevisions[0]);
 
             assert.equal(1, o.get());
             assert.equal(2, c.get());
-            assert.equal(1, o.observers.length);
-            assert.equal(1, o.observerRevisions.length);
+            assert.equal(1, o.observersCount);
             assert.equal(2, c.revision);
             assert.equal(2, o.observerRevisions[0]);
         });
@@ -72,9 +70,9 @@ describe('Observable', function() {
             assert.equal(2, o1.get());
             assert.equal(3, o2.get());
             assert.equal(6, c.get());
-            assert.equal(1, o1.observers.length);
-            assert.equal(1, o2.observers.length);
-            assert.equal(0, c.observers.length);
+            assert.equal(1, o1.observersCount);
+            assert.equal(1, o2.observersCount);
+            assert.equal(0, c.observersCount);
         });
         it('creates computable that recieves an update of revision from observable', function() {
             var o1 = observable(2);
@@ -84,13 +82,13 @@ describe('Observable', function() {
 
             o1.set(5);
             assert.equal(15, c.get());
-            assert.equal(1, o1.observers.length);
-            assert.equal(1, o2.observers.length);
+            assert.equal(1, o1.observersCount);
+            assert.equal(1, o2.observersCount);
 
             o2.set(10);
             assert.equal(50, c.get());
-            assert.equal(1, o1.observers.length);
-            assert.equal(1, o2.observers.length);
+            assert.equal(1, o1.observersCount);
+            assert.equal(1, o2.observersCount);
         });
         it('creates computable with 3 observables, test lazy unsubscribe', function() {
             var o1 = observable(false);
@@ -99,35 +97,35 @@ describe('Observable', function() {
             var c = computable(function(){ return o1.get() ? o2.get() : o3.get()})
 
             assert.equal(10, c.get());
-            assert.equal(1, o1.observers.length);
-            assert.equal(0, o2.observers.length);
-            assert.equal(1, o3.observers.length);
+            assert.equal(1, o1.observersCount);
+            assert.equal(0, o2.observersCount);
+            assert.equal(1, o3.observersCount);
 
             o1.set(true);
             assert.equal(5, c.get());
-            assert.equal(1, o1.observers.length);
-            assert.equal(1, o2.observers.length);
-            assert.equal(1, o3.observers.length);   // lazy unsubscription
+            assert.equal(1, o1.observersCount);
+            assert.equal(1, o2.observersCount);
+            assert.equal(1, o3.observersCount);   // lazy unsubscription
 
             o3.set(11);
-            assert.equal(0, o3.observers.length);   // it was unsubscribed on its set()
+            assert.equal(0, o3.observersCount);   // it was unsubscribed on its set()
             assert.equal(5, c.get());
-            assert.equal(1, o1.observers.length);
-            assert.equal(1, o2.observers.length);
-            assert.equal(0, o3.observers.length);
+            assert.equal(1, o1.observersCount);
+            assert.equal(1, o2.observersCount);
+            assert.equal(0, o3.observersCount);
 
             o1.set(false);
             assert.equal(11, c.get());
-            assert.equal(1, o1.observers.length);
-            assert.equal(1, o2.observers.length);   // lazy unsubscription
-            assert.equal(1, o3.observers.length);   
+            assert.equal(1, o1.observersCount);
+            assert.equal(1, o2.observersCount);   // lazy unsubscription
+            assert.equal(1, o3.observersCount);   
 
             o2.set(6);
-            assert.equal(0, o2.observers.length);   // it was unsubscribed on its set()
+            assert.equal(0, o2.observersCount);   // it was unsubscribed on its set()
             assert.equal(11, c.get());
-            assert.equal(1, o1.observers.length);
-            assert.equal(0, o2.observers.length);
-            assert.equal(1, o3.observers.length);         
+            assert.equal(1, o1.observersCount);
+            assert.equal(0, o2.observersCount);
+            assert.equal(1, o3.observersCount);         
         })
     })
 })

@@ -208,18 +208,19 @@ function computable(thunk) {
     return new Computable(thunk);
 }
 
-function Reaction(reaction, manager) {
+function Reaction(context, reaction, manager) {
     this.isLeadingReaction = false;
     this.revision = globalNextRevision();
     this.parentReaction = null;
     this.parentReactionRevision = 0;
     this.transactionRevision = 0;
     this.resultRevision = 0;
+    this.context = context;
     this.reaction = reaction;
     this.manager = manager;
 
     if (!manager)
-        this.run(this, true);
+        this.runReaction();
 }
 
 Reaction.prototype = {
@@ -227,7 +228,7 @@ Reaction.prototype = {
         if (!this.manager) {
             this.runReaction();
         } else {
-            this.manager();
+            this.manager.apply(this.context, this);
         }
     },
     notifyRevisionUpdate: function() {
@@ -242,36 +243,21 @@ Reaction.prototype = {
         }
         globalCallStack.push(this);
         this.revision = globalNextRevision();
-        var value = this.reaction.apply(this, arguments);
+        var value = this.reaction.apply(this.context, arguments);
         this.resultRevision = this.revision;
         globalCallStack.pop();
         return value;
+    },
+    settle: function() {
+        this.revision = this.resultRevision;
     },
     cancel: function() {
         this.revision = this.resultRevision = globalNextRevision();
     },
 }
 
-function reaction(runner, manager) {
-    return new Reaction(runner, manager);
-}
-
-var ReactiveMixin = {
-    componentWillMount: function() {
-        var self = this;
-        this.reaction = new Reaction(this.reactive, function() {
-            self.forceUpdate();
-        });
-    },
-    shouldComponentUpdate: function(nextProps) {
-        return this.reaction.revision !== this.reaction.resultRevision;
-    },
-    componentWillUnmount: function() {
-        this.reaction.cancel();
-    },
-    render: function() {
-        return this.reaction.runReaction();
-    }
+function reaction(runner) {
+    return new Reaction(undefined, runner, undefined);
 }
 
 module.exports = {
@@ -282,7 +268,6 @@ module.exports = {
     computable: computable,
     Reaction: Reaction,
     reaction: reaction,
-    ReactiveMixin: ReactiveMixin,
     transaction: transaction,
 }
 
