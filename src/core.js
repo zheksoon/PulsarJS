@@ -232,6 +232,7 @@ Reaction.prototype = {
         }
     },
     notifyRevisionUpdate: function() {
+        this.revision = globalNextRevision();
         globalReactionList[globalReactionCount++] = this;
     },
     runReaction: function() {
