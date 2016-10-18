@@ -5,6 +5,8 @@ var HashSet = require('./HashSet');
 
 var MIN_SUBSCRIPTIONS_COUNT_BY_2 = 4 * 2;
 
+var DEBUG = false;
+
 /* Global variables */
 
 var gCallStack = [undefined];
@@ -21,20 +23,69 @@ function random() {
     return (Math.random() * 0x3FFFFFFF) | 0;
 }
 
-/* Observable value */ 
+// Xorshift random
+// var x = (Math.random() * 0x3FFFFFFF) | 0;
+// var y = (Math.random() * 0x3FFFFFFF) | 0;
+// var z = (Math.random() * 0x3FFFFFFF) | 0;
+// var w = (Math.random() * 0x3FFFFFFF) | 0;
+// var x = 1215234;
+// var y = 981293;
+// var z = 684631684;
+// var w = 319851236;
+// function random() {
+//     var t = x;
+//     t ^= t << 11;
+//     t ^= t >> 8;
+//     x = y; y = z; z = w;
+//     w ^= w >> 19;
+//     w ^= t;
+//     return w;
+// }
 
-function Observable(value, name) {
-    this._name = name;
-    this._hash = random();
-    this._value = value;
-    this._subscribers = new HashSet();
-    this._isDirty = false;
+function removeSubscriptions(notifier, resize) {
+    var subscriptions = this._subscriptions;
+    for (var i = 0; i < this._subscriptionsCount; i++) {
+        if (subscriptions[i] !== notifier) {
+            subscriptions[i].unsubscribe(this);
+        }
+        subscriptions[i] = undefined;
+    }
+    if (resize) {
+        var subscriptionsLength = subscriptions.length;
+        if (subscriptionsLength > MIN_SUBSCRIPTIONS_COUNT_BY_2 && 
+            subscriptionsLength > this._subscriptionsCount * 4) {
+            subscriptions.length = subscriptionsLength >> 1;
+        }    
+    }
+    this._subscriptionsCount = 0;
 }
 
-Observable.prototype.get = function() {
-    console.log(`getting observable ${this._name}...`);
-    this._isDirty = false;
+function notifyAndRemoveSubscribers() {
+    var subscribers = this._subscribers;
+    if (subscribers.size() > 0) {
+        /* 
+            HashSet.forEach inlined, see it for details of the magic, equivalent of 
+                subscribers.forEach((item) => item.notify());
+            but with inplace item removal
+        */
+        var items = subscribers.items();
+        var length = items.length - 1;
+        var i = length;
+        while (items[i] === undefined) i = (i - 1) & length;
+        while (items[i] !== undefined) i = (i + 1) & length;
+        for (var j = (i - 1) & length; j !== i; j = (j - 1) & length) {
+            if (items[j] !== undefined) {
+                var item = items[j];
+                items[j] = undefined;
+                item.notify(this);       
+            }
+        }
+        subscribers.resize();
+        subscribers.setSize(0);
+    }
+}
 
+function addSubscriber(subscriber) {
     if (gCallStackDepth > 0) {
         var subscriber = gCallStack[gCallStackDepth - 1];
         var subscribers = this._subscribers;
@@ -42,25 +93,31 @@ Observable.prototype.get = function() {
             subscriber.subscribe(this);
         }
     }
+}
+
+/* Observable value */ 
+
+function Observable(value, name) {
+    this._hash = random();
+    this._name = name;    
+    this._value = value;
+    this._subscribers = new HashSet();
+}
+
+Observable.prototype.get = function() {
+    if (DEBUG) {
+        console.log(`getting observable ${this._name}...`);
+    }
+    this._addSubscriber();
     return this._value;
 }
 
 Observable.prototype.set = function(value) {
-    console.log(`setting observable ${this._name} to ${value}...`);
-    this._isDirty = true;
-
-    var subscribers = this._subscribers;
-    if (subscribers.size() > 0) {
-        var items = subscribers.items();
-        for (var i = 0; i < items.length; i++) {
-            if (items[i] !== undefined) {
-                items[i].notify(this);
-                items[i] = undefined;
-            }
-        }
-        subscribers.setSize(0);
+    if (DEBUG) {
+        console.log(`setting observable ${this._name} to ${value}...`);
     }
     this._value = value;
+    this._notifyAndRemoveSubscribers();
 
     if (gTransactionDepth === 0) {
         runReactions();
@@ -68,15 +125,20 @@ Observable.prototype.set = function(value) {
 }
 
 Observable.prototype.unsubscribe = function(subscriber) {
-    console.log(`unsubscribing observable ${this._name} from ${subscriber._name}`);
+    if (DEBUG) {
+        console.log(`unsubscribing observable ${this._name} from ${subscriber._name}`);
+    }
     this._subscribers.remove(subscriber);
 }
+
+Observable.prototype._addSubscriber = addSubscriber;
+Observable.prototype._notifyAndRemoveSubscribers = notifyAndRemoveSubscribers;
 
 /* Computable value */
 
 function Computable(computer, name) {
-    this._name = name;
     this._hash = random();
+    this._name = name;
     this._value = undefined;
     this._subscribers = new HashSet();
     this._subscriptions = [undefined];
@@ -86,14 +148,11 @@ function Computable(computer, name) {
 }
 
 Computable.prototype.get = function() {
-    console.log(`getting computable ${this._name}${this._isDirty ? " (dirty)" : ""}...`)
-    if (gCallStackDepth > 0) {
-        var subscriber = gCallStack[gCallStackDepth - 1];
-        var subscribers = this._subscribers;
-        if (subscribers.add(subscriber)) {
-            subscriber.subscribe(this);
-        }
+    if (DEBUG) {
+        console.log(`getting computable ${this._name}${this._isDirty ? " (dirty)" : ""}...`);
     }
+    this._addSubscriber();
+
     if (this._isDirty) {
         gCallStack[gCallStackDepth++] = this;
         this._value = this._computer();
@@ -105,75 +164,63 @@ Computable.prototype.get = function() {
 }
 
 Computable.prototype.notify = function(notifier) {
-    console.log(`notifying computable ${this._name}...`)
+    if (DEBUG) {
+        console.log(`notifying computable ${this._name} from ${notifier._name}...`);
+    }
     this._isDirty = true;
-
-    var subscriptions = this._subscriptions;
-    for (var i = 0; i < this._subscriptionsCount; i++) {
-        if (subscriptions[i] !== notifier) {
-            subscriptions[i].unsubscribe(this);
-        }
-        subscriptions[i] = undefined;
-    }
-    var subscriptionsLength = subscriptions.length;
-    if (subscriptionsLength > MIN_SUBSCRIPTIONS_COUNT_BY_2 && 
-        subscriptionsLength > this._subscriptionsCount * 4) {
-        subscriptions.length = subscriptionsLength >> 1;
-    }    
-    this._subscriptionsCount = 0;
-
-    var subscribers = this._subscribers;
-    if (subscribers.size() > 0) {
-        var items = subscribers.items();
-        for (var i = 0; i < items.length; i++) {
-            if (items[i] !== undefined) {
-                items[i].notify(this);
-                items[i] = undefined;
-            }
-        }
-        subscribers.setSize(0);
-    }
+    this._removeSubscriptions(notifier, true);
+    this._notifyAndRemoveSubscribers();
 }
 
 Computable.prototype.unsubscribe = function(subscriber) {
-    console.log(`unsubscribing computable ${this._name} from ${subscriber._name}...`);
+    if (DEBUG) {
+        console.log(`unsubscribing computable ${this._name} from ${subscriber._name}...`);
+    }
     this._subscribers.remove(subscriber);
 
     if (this._subscribers.size() === 0) {
-        var subscriptions = this._subscriptions;
-        for (var i = 0; i < this._subscriptionsCount; i++) {
-            subscriptions[i].unsubscribe(this);
-            subscriptions[i] = undefined;
-        }
-        this._subscriptionsCount = 0;
+        this._isDirty = true;
+        this._removeSubscriptions(undefined, false);
     }
 }
 
 Computable.prototype.subscribe = function(subscription) {
-    console.log(`subscribing ${this._name} to ${subscription._name}...`)
+    if (DEBUG) {
+        console.log(`subscribing ${this._name} to ${subscription._name}...`);
+    }
     this._subscriptions[this._subscriptionsCount++] = subscription;
 }
 
-/* Reactive function */
+Computable.prototype._addSubscriber = addSubscriber;
+Computable.prototype._notifyAndRemoveSubscribers = notifyAndRemoveSubscribers;
+Computable.prototype._removeSubscriptions = removeSubscriptions;
 
-function Reactive(reaction, name) {
-    this._name = name;
+/* Reaction */
+
+function Reaction(reaction, name) {
     this._hash = random();
+    this._name = name;    
     this._reaction = reaction;
-    this._isDirty = false;
+    this._parent = null;
     this._subscriptions = [undefined];
     this._subscriptionsCount = 0;
+    this._isDirty = false;
 
     this.run();
 }
 
-Reactive.prototype.run = function() {
-    console.log(`running reaction ${this._name}...`)
+Reaction.prototype.run = function() {
+    if (DEBUG) {
+        console.log(`running reaction ${this._name}...`);
+    }
     this._isDirty = false;
 
     if (gCallStackDepth > 0) {
         var parent = gCallStack[gCallStackDepth - 1];
-        parent.subscribe(this);
+        if (this._parent === null) {
+            this._parent = parent;
+            parent.subscribe(this);
+        }
     }
 
     gCallStack[gCallStackDepth++] = this;
@@ -181,47 +228,38 @@ Reactive.prototype.run = function() {
     gCallStack[gCallStackDepth--] = undefined;
 }
 
-Reactive.prototype.notify = function(notifier) {
-    console.log(`notifying reaction ${this._name}...`);
-    var subscriptions = this._subscriptions;
-    for (var i = 0; i < this._subscriptionsCount; i++) {
-        if (subscriptions[i] !== notifier) {
-            subscriptions[i].unsubscribe(this);
-        }
-        subscriptions[i] = undefined;
+Reaction.prototype.notify = function(notifier) {
+    if (DEBUG) {
+        console.log(`notifying reaction ${this._name} from ${notifier._name}...`);
     }
-    var subscriptionsLength = subscriptions.length;
-    if (subscriptionsLength > MIN_SUBSCRIPTIONS_COUNT_BY_2 && 
-        subscriptionsLength > this._subscriptionsCount * 4) {
-        subscriptions.length = subscriptionsLength >> 1;
-    }    
-    this._subscriptionsCount = 0;
-
     this._isDirty = true;
-
+    this._removeSubscriptions(notifier, true);
     gScheduledReactions[gScheduledReactionsCount++] = this;
 }
 
-Reactive.prototype.unsubscribe = function(subscriber) {
-    console.log(`unsubscribing reaction ${this._name} from ${subscriber._name}...`)
-    this._isDirty = false;
-
-    var subscriptions = this._subscriptions;
-    for (var i = 0; i < this._subscriptionsCount; i++) {
-        subscriptions[i].unsubscribe(this);
-        subscriptions[i] = undefined;
+Reaction.prototype.unsubscribe = function(subscriber) {
+    if (DEBUG) {
+        console.log(`unsubscribing reaction ${this._name} from ${subscriber._name}...`);
     }
+    this._isDirty = false;
+    this._removeSubscriptions(undefined, false);
 }
 
-Reactive.prototype.subscribe = function(subscription) {
-    console.log(`subscribing reaction ${this._name} to ${subscription._name}...`);
+Reaction.prototype.subscribe = function(subscription) {
+    if (DEBUG) {
+        console.log(`subscribing reaction ${this._name} to ${subscription._name}...`);
+    }
     this._subscriptions[this._subscriptionsCount++] = subscription;
 }
+
+Reaction.prototype._removeSubscriptions = removeSubscriptions;
 
 /* Functions */
 
 function runReactions() {
-    console.log(`running ${gScheduledReactionsCount} reactions...`)
+    if (DEBUG) {
+        console.log(`running ${gScheduledReactionsCount} reactions...`);
+    }
     for (var i = 0; i < gScheduledReactionsCount; i++) {
         var reaction = gScheduledReactions[i];
         if (reaction._isDirty) {
@@ -240,26 +278,9 @@ function transaction(transactionBody) {
     }
 }
 
-/* test */
-var a = new Observable(1, 'A');
-var b = new Observable(2, 'B');
-var c = new Computable(function() {
-    return a.get() + b.get();
-}, 'C');
-var d = new Reactive(function() {
-    console.log(`${a.get()} + ${b.get()} = ${c.get()}`);
-}, 'D');
-var e = new Computable(function() {
-    return a.get() * a.get();
-}, 'E')
-var f = new Reactive(function() {
-    console.log(`${a.get()}^2 = ${e.get()}`);
-}, 'F')
-a.set(5);
-a.set(10);
-a.set(20);
-b.set(15);
-transaction(function() {
-    a.set(1);
-    b.set(1);
-})
+module.exports = {
+    Observable: Observable,
+    Computable: Computable,
+    Reaction: Reaction,
+    transaction: transaction,
+}
